@@ -3,28 +3,25 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>P.F.I 11 - Seguimiento Académico</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <title>EduTrack 11 - Seguimiento Académico</title>
   <style>
     body {
       font-family: Arial, sans-serif;
       background: #f0f4f8;
-      margin: 0;
       padding: 20px;
     }
     .container {
-      max-width: 900px;
+      max-width: 800px;
       margin: auto;
       background: white;
       padding: 20px;
-      border-radius: 10px;
+      border-radius: 12px;
       box-shadow: 0 4px 12px rgba(0,0,0,0.1);
     }
     input, select, button {
-      padding: 8px;
-      margin: 5px 0;
       width: 100%;
+      padding: 10px;
+      margin: 6px 0;
       border: 1px solid #ccc;
       border-radius: 5px;
     }
@@ -33,238 +30,186 @@
       border-collapse: collapse;
       margin-top: 20px;
     }
-    table, th, td {
-      border: 1px solid #ccc;
-    }
     th, td {
+      border: 1px solid #ccc;
       padding: 10px;
       text-align: center;
     }
-    .promedio {
-      margin-top: 20px;
-      font-weight: bold;
-      color: #2980b9;
-    }
-    .acciones button {
-      margin: 0 2px;
-    }
-    .filtros {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      margin-top: 20px;
-    }
-    .filtros > * {
-      flex: 1;
-    }
-    button {
-      transition: background 0.3s;
-    }
-    button:hover {
-      background: #dfe6e9;
-    }
+    .hidden { display: none; }
+    .acciones button { margin: 0 2px; }
+    .logout { float: right; }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>📘 P.F.I - 11</h1>
-    <h2>Registro de Notas por Período</h2>
+    <h2>📘 EduTrack 11</h2>
 
-    <label for="materia">Materia:</label>
-    <input type="text" id="materia" placeholder="Ej: Matemáticas">
+    <!-- LOGIN/REGISTRO -->
+    <div id="authSection">
+      <h3>Iniciar sesión / Registrarse</h3>
+      <input type="email" id="email" placeholder="Correo electrónico">
+      <input type="password" id="password" placeholder="Contraseña">
+      <button onclick="login()">Iniciar Sesión</button>
+      <button onclick="register()">Registrarse</button>
+    </div>
 
-    <label for="periodo">Período:</label>
-    <select id="periodo">
-      <option value="1">Período 1</option>
-      <option value="2">Período 2</option>
-      <option value="3">Período 3</option>
-    </select>
+    <!-- APP -->
+    <div id="appSection" class="hidden">
+      <button class="logout" onclick="logout()">Cerrar Sesión</button>
+      <h3>Registro de Notas</h3>
 
-    <label for="nota">Nota:</label>
-    <select id="nota">
-      <option value="J">J - Bajo (1.0 a 3.2)</option>
-      <option value="B">B - Básico (3.3 a 3.9)</option>
-      <option value="A">A - Alto (4.0 a 4.4)</option>
-      <option value="S">S - Superior (4.5 a 5.0)</option>
-    </select>
-
-    <button onclick="agregarNota()">Agregar Nota</button>
-
-    <div class="filtros">
-      <input type="text" id="filtroMateria" placeholder="Filtrar por materia" oninput="actualizarTabla()">
-      <select id="filtroPeriodo" onchange="actualizarTabla()">
-        <option value="">Todos los períodos</option>
+      <input type="text" id="materia" placeholder="Materia (Ej: Matemáticas)">
+      <select id="periodo">
         <option value="1">Período 1</option>
         <option value="2">Período 2</option>
         <option value="3">Período 3</option>
       </select>
-      <select id="filtroNota" onchange="actualizarTabla()">
-        <option value="">Todas las notas</option>
-        <option value="J">J</option>
-        <option value="B">B</option>
-        <option value="A">A</option>
-        <option value="S">S</option>
+      <select id="nota">
+        <option value="J">J - Bajo (1.0 a 3.2)</option>
+        <option value="B">B - Básico (3.3 a 3.9)</option>
+        <option value="A">A - Alto (4.0 a 4.4)</option>
+        <option value="S">S - Superior (4.5 a 5.0)</option>
       </select>
+      <button onclick="agregarNota()">Agregar Nota</button>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Materia</th>
+            <th>Período</th>
+            <th>Nota</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="tablaNotas"></tbody>
+      </table>
     </div>
-
-    <table id="tablaNotas">
-      <thead>
-        <tr>
-          <th>Materia</th>
-          <th>Período</th>
-          <th>Nota</th>
-          <th>Acciones</th>
-        </tr>
-      </thead>
-      <tbody></tbody>
-    </table>
-
-    <div class="promedio" id="promedio">Promedio: -</div>
-
-    <button onclick="exportarExcel()">Exportar a Excel</button>
-    <button onclick="exportarPDF()">Exportar a PDF</button>
   </div>
 
-  <script>
-    let notas = JSON.parse(localStorage.getItem("notasEduTrack")) || [];
+  <!-- Firebase + lógica -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-app.js";
+    import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-auth.js";
+    import { getFirestore, collection, addDoc, getDocs, query, where, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
 
-    const equivalencias = {
-      'J': 2.5,  // Promedio entre 1.0 y 3.2
-      'B': 3.6,  // Promedio entre 3.3 y 3.9
-      'A': 4.2,  // Promedio entre 4.0 y 4.4
-      'S': 4.8   // Promedio entre 4.5 y 5.0
+    // Configuración Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyAboGleg8QF-E4cFGO-3brxATnkzQ1Xoj8",
+      authDomain: "seguimiento-notas-11.firebaseapp.com",
+      projectId: "seguimiento-notas-11",
+      storageBucket: "seguimiento-notas-11.appspot.com",
+      messagingSenderId: "380703829461",
+      appId: "1:380703829461:web:600aeeb25afd7fefade15c",
+      measurementId: "G-8PZ0EC1ZJT"
     };
 
-    function guardarNotas() {
-      localStorage.setItem("notasEduTrack", JSON.stringify(notas));
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    let currentUserId = null;
+
+    // Registro
+    async function register() {
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+      try {
+        await createUserWithEmailAndPassword(auth, email, password);
+        alert("Registrado exitosamente. Ya puedes ingresar.");
+      } catch (error) {
+        alert("Error en el registro: " + error.message);
+      }
     }
 
-    function agregarNota() {
+    // Login
+    async function login() {
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+      try {
+        await signInWithEmailAndPassword(auth, email, password);
+      } catch (error) {
+        alert("Error al iniciar sesión: " + error.message);
+      }
+    }
+
+    // Logout
+    function logout() {
+      signOut(auth);
+    }
+
+    // Escucha cambios de sesión
+    onAuthStateChanged(auth, (user) => {
+      if (user) {
+        currentUserId = user.uid;
+        document.getElementById("authSection").classList.add("hidden");
+        document.getElementById("appSection").classList.remove("hidden");
+        cargarNotas();
+      } else {
+        currentUserId = null;
+        document.getElementById("authSection").classList.remove("hidden");
+        document.getElementById("appSection").classList.add("hidden");
+        document.getElementById("tablaNotas").innerHTML = "";
+      }
+    });
+
+    // Agregar nota
+    async function agregarNota() {
       const materia = document.getElementById("materia").value.trim();
       const periodo = document.getElementById("periodo").value;
       const nota = document.getElementById("nota").value;
 
-      if (!materia || !nota) {
-        alert("Por favor completa todos los campos.");
+      if (!materia) {
+        alert("Por favor, escribe una materia.");
         return;
       }
 
-      // Validación para evitar duplicados por materia y período
-      if (notas.some(n => n.materia.toLowerCase() === materia.toLowerCase() && n.periodo === periodo)) {
-        alert("Ya has registrado una nota para esta materia en este período.");
+      // Verificar si ya existe nota para esa materia y período
+      const q = query(collection(db, "notas"), where("userId", "==", currentUserId), where("materia", "==", materia), where("periodo", "==", periodo));
+      const snapshot = await getDocs(q);
+      if (!snapshot.empty) {
+        alert("Ya hay una nota registrada para esta materia en este período.");
         return;
       }
 
-      notas.push({ materia, periodo, nota });
-      guardarNotas();
-      actualizarTabla();
-
-      document.getElementById("materia").value = "";
-      document.getElementById("periodo").value = "1";
-      document.getElementById("nota").value = "J";
-    }
-
-    function eliminarNota(index) {
-      if (confirm("¿Deseas eliminar esta nota?")) {
-        notas.splice(index, 1);
-        guardarNotas();
-        actualizarTabla();
-      }
-    }
-
-    function actualizarTabla() {
-      const tbody = document.querySelector("#tablaNotas tbody");
-      tbody.innerHTML = "";
-
-      const filtroMateria = document.getElementById("filtroMateria").value.toLowerCase();
-      const filtroPeriodo = document.getElementById("filtroPeriodo").value;
-      const filtroNota = document.getElementById("filtroNota").value;
-
-      const notasFiltradas = notas.filter((n) => {
-        return (
-          (!filtroMateria || n.materia.toLowerCase().includes(filtroMateria)) &&
-          (!filtroPeriodo || n.periodo === filtroPeriodo) &&
-          (!filtroNota || n.nota === filtroNota)
-        );
+      await addDoc(collection(db, "notas"), {
+        userId: currentUserId,
+        materia,
+        periodo,
+        nota
       });
 
-      notasFiltradas.forEach((n, indexGlobal) => {
-        const row = `<tr>
+      document.getElementById("materia").value = "";
+      cargarNotas();
+    }
+
+    // Cargar notas
+    async function cargarNotas() {
+      const tabla = document.getElementById("tablaNotas");
+      tabla.innerHTML = "";
+
+      const q = query(collection(db, "notas"), where("userId", "==", currentUserId));
+      const snapshot = await getDocs(q);
+
+      snapshot.forEach(docSnap => {
+        const n = docSnap.data();
+        const fila = document.createElement("tr");
+        fila.innerHTML = `
           <td>${n.materia}</td>
           <td>${n.periodo}</td>
           <td>${n.nota}</td>
-          <td class="acciones">
-            <button onclick="eliminarNota(${notas.indexOf(n)})">🗑️</button>
-          </td>
-        </tr>`;
-        tbody.innerHTML += row;
+          <td><button onclick="eliminarNota('${docSnap.id}')">🗑️</button></td>
+        `;
+        tabla.appendChild(fila);
       });
-
-      calcularPromedio(notasFiltradas, filtroPeriodo);
     }
 
-    function calcularPromedio(lista, filtroPeriodo) {
-      const promedioDiv = document.getElementById("promedio");
-
-      if (lista.length === 0) {
-        promedioDiv.textContent = "Promedio: -";
-        return;
+    // Eliminar nota
+    window.eliminarNota = async function(id) {
+      if (confirm("¿Deseas eliminar esta nota?")) {
+        await deleteDoc(doc(db, "notas", id));
+        cargarNotas();
       }
-
-      const suma = lista.reduce((acc, n) => acc + equivalencias[n.nota], 0);
-      const promedio = suma / lista.length;
-      let calificacion;
-
-      if (promedio < 3.3) calificacion = "J - Bajo";
-      else if (promedio < 4.0) calificacion = "B - Básico";
-      else if (promedio < 4.5) calificacion = "A - Alto";
-      else calificacion = "S - Superior";
-
-      if (filtroPeriodo) {
-        promedioDiv.textContent = `Promedio Período ${filtroPeriodo}: ${promedio.toFixed(2)} (${calificacion})`;
-      } else {
-        promedioDiv.textContent = `Promedio General: ${promedio.toFixed(2)} (${calificacion})`;
-      }
-    }
-
-    function exportarExcel() {
-      const data = [["Materia", "Período", "Nota"]];
-      notas.forEach(n => data.push([n.materia, n.periodo, n.nota]));
-      const hoja = XLSX.utils.aoa_to_sheet(data);
-      const libro = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(libro, hoja, "Notas");
-      XLSX.writeFile(libro, "notas.xlsx");
-    }
-
-    function exportarPDF() {
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF();
-      doc.setFontSize(16);
-      doc.text("Reporte de Notas - EduTrack 11", 20, 15);
-      doc.setFontSize(12);
-
-      let y = 30;
-      doc.text("Materia", 20, y);
-      doc.text("Período", 80, y);
-      doc.text("Nota", 140, y);
-      y += 10;
-
-      notas.forEach(n => {
-        doc.text(n.materia, 20, y);
-        doc.text(n.periodo, 80, y);
-        doc.text(n.nota, 140, y);
-        y += 10;
-        if (y > 280) {
-          doc.addPage();
-          y = 20;
-        }
-      });
-
-      doc.save("notas.pdf");
-    }
-
-    // Inicializar tabla al cargar
-    actualizarTabla();
+    };
   </script>
 </body>
 </html>
